@@ -8,7 +8,7 @@ import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.project.Project
 import java.io.File
 
-abstract class BaseCmdTool(private val project: Project) {
+abstract class BaseCmdTool(protected val project: Project) {
     protected fun runCommand(cmd: List<String>, workDir: File): ProcessOutput {
         val command = GeneralCommandLine(cmd).withWorkDirectory(workDir)
         val handler = CapturingProcessHandler(command)
@@ -103,3 +103,4 @@ class GitCommitTool(project: Project) : ArchitectTool, BaseCmdTool(project) {
         return ToolResponse.ok("""{"ok":true}""", (add.stdout + "\n" + commit.stdout).trim())
     }
 }
+
