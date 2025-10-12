@@ -9,10 +9,8 @@ repositories {
 }
 
 dependencies {
-    // Целевая IDE
     intellijPlatform {
-        intellijIdea(providers.gradleProperty("platformVersion"))
-        // если нужен Java PSI/инспекции:
+        intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
         bundledPlugin("com.intellij.java")
     }
 
