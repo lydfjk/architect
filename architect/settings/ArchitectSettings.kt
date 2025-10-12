@@ -42,7 +42,7 @@ class ArchitectConfigurable(private val project: Project) : Configurable {
     override fun getDisplayName() = "Architect"
     override fun createComponent() = panel
     override fun isModified(): Boolean {
-        val state = ArchitectSettingsService.get(project).state
+        val state = ArchitectSettingsService.get(project).state()
         val modelChanged = modelField.text.trim() != state.model
         val mcpChanged = mcpBox.isSelected != state.mcpEnabled
         val apiProvided = apiField.password.isNotEmpty()
@@ -51,16 +51,17 @@ class ArchitectConfigurable(private val project: Project) : Configurable {
 
     override fun apply() {
         val s = ArchitectSettingsService.get(project)
-        s.state.model = modelField.text.trim().ifEmpty { "deepseek-chat-v3.2" }
-        s.state.mcpEnabled = mcpBox.isSelected
+        s.state().model = modelField.text.trim().ifEmpty { "deepseek-chat-v3.2" }
+        s.state().mcpEnabled = mcpBox.isSelected
         SecretStore(project).saveApiKey(String(apiField.password))
         apiField.text = ""
     }
 
     override fun reset() {
-        val s = ArchitectSettingsService.get(project)
-        modelField.text = s.state.model
-        mcpBox.isSelected = s.state.mcpEnabled
+        val s = ArchitectSettingsService.get(project)␊
+        modelField.text = s.state().model
+        mcpBox.isSelected = s.state().mcpEnabled
         apiField.text = ""
     }
 }
+
