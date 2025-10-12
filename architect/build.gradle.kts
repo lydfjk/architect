@@ -1,5 +1,7 @@
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+
 plugins {
-    kotlin("jvm") version "2.0.20"
+    kotlin("jvm") version "2.1.0"
     id("org.jetbrains.intellij.platform") version "2.9.0" // Gradle plugin 2.x
 }
 
@@ -34,6 +36,12 @@ intellijPlatform {
 
 kotlin {
     jvmToolchain(17)
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
 }
 
 tasks {
