@@ -5,7 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import ai.architect.persona.ArchitectPersona
-import com.intellij.ui.components.JBComboBox
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
@@ -17,14 +17,14 @@ import javax.swing.*
 class ArchitectToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = JPanel(BorderLayout())
-        val output = JBTextArea().apply {
+                val output = JBTextArea().apply {
             isEditable = false
             lineWrap = true
             wrapStyleWord = true
             border = JBUI.Borders.empty(8)
         }
         val personas = ArchitectPersona.all()
-        val personaBox = JBComboBox<ArchitectPersona>(personas.toTypedArray()).apply {
+        val personaBox = ComboBox(personas.toTypedArray()).apply {
             renderer = object : DefaultListCellRenderer() {
                 override fun getListCellRendererComponent(
                     list: JList<out Any>?,
@@ -106,3 +106,4 @@ class ArchitectToolWindowFactory : ToolWindowFactory, DumbAware {
         input.addActionListener { sendMessage() }
     }
 }
+
