@@ -81,11 +81,11 @@ class ListFilesTool(private val project: Project) : ArchitectTool {
 }
 
 // утилиты
-private fun String.escapeJson() = "\"" + this.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
-private fun String.unescapeJson() = this.replace("\\\"", "\"").replace("\\\\", "\\")
-private fun String.matchesGlob(glob: String): Boolean {
+internal fun String.escapeJson(): String = "\"" + this.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+internal fun String.unescapeJson(): String = this.replace("\\\"", "\"").replace("\\\\", "\\")
+internal fun String.matchesGlob(glob: String): Boolean {
     val regex = glob.replace(".", "\\.").replace("**", ".+").replace("*", "[^/]*")
     return Regex("^$regex$").matches(this)
 }
-private fun List<String>.toJsonArray(): String =
+internal fun List<String>.toJsonArray(): String =
     "[" + this.joinToString(",") { "\"" + it.replace("\\", "\\\\") + "\"" } + "]"
