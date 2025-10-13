@@ -13,6 +13,22 @@ import java.time.Duration
 
 class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
 
+    data class ToolCallResult(val resultJson: String, val humanReadable: String)
+
+    data class ToolExecution(
+        val name: String,
+        val arguments: String,
+        val result: ToolCallResult
+    )
+
+    data class ChatResult(
+        val reply: String,
+        val conversation: List<Msg>,
+        val appendedMessages: List<Msg>,
+        val toolExecutions: List<ToolExecution>,
+        val isFinal: Boolean
+    )
+
     private val http = OkHttpClient.Builder()
         .callTimeout(Duration.ofSeconds(90))
         .build()
@@ -20,61 +36,63 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
     private val moshi = Moshi.Builder().build()
     private val json = "application/json; charset=utf-8".toMediaType()
 
-    // Сигнатуры для tool-calling в стиле OpenAI
-    @JsonClass(generateAdapter = true)
-    data class ToolDef(
-        val type: String = "function",
-        val function: FunctionDef
-    )
-    @JsonClass(generateAdapter = true)
-    data class FunctionDef(
-        val name: String,
-        val description: String,
-        @Json(name = "parameters") val jsonSchema: Map<String, Any>
-    )
-
     fun chat(
-        userText: String,
+        conversation: List<Msg>,
         toolSchemas: List<ToolDef>,
-        systemPreamble: String,
-        onToolCall: (name: String, jsonArgs: String) -> String
-    ): String {
+        onToolCall: (name: String, jsonArgs: String) -> ToolCallResult,
+        maxIterations: Int = 6
+    ): ChatResult {
         val apiKey = SecretStore(ctx).loadApiKey()
         require(!apiKey.isNullOrBlank()) { "DeepSeek API Key не настроен (Settings → Architect)" }
 
-        // Первый запрос
         val settings = ArchitectSettingsService.get(ctx)
         val model = settings.state().model.ifBlank { "deepseek-chat-v3.2" }
 
-        val req1 = ChatRequest(
-            model = model,
-            temperature = 0.2,
-            tool_choice = "auto",
-            tools = toolSchemas,
-            messages = listOf(
-                Msg(role = "system", content = systemPreamble),
-                Msg(role = "user", content = userText)
-            )
-        )
-
-        val step1 = execute(apiKey, req1)
-
-        // Если модель вызвала инструменты — обработаем детерминированно
-        val toolCalls = step1.choices.firstOrNull()?.message?.tool_calls.orEmpty()
-        var messages = req1.messages.toMutableList()
-        if (toolCalls.isNotEmpty()) {
-            for (tc in toolCalls) {
-                val args = tc.function.arguments ?: "{}"
-                val result = onToolCall(tc.function.name, args)
-                messages.add(Msg(role = "tool", name = tc.function.name, content = result))
-            }
-            // Финальный ответ после tool_result
-            val req2 = req1.copy(messages = messages)
-            val step2 = execute(apiKey, req2)
-            return step2.choices.firstOrNull()?.message?.content ?: "(пусто)"
+        require(conversation.firstOrNull()?.role == "system") {
+            "История диалога должна начинаться с системного промпта"
         }
 
-        return step1.choices.firstOrNull()?.message?.content ?: "(пусто)"
+        val workingMessages = conversation.toMutableList()
+        val appended = mutableListOf<Msg>()
+        val toolLog = mutableListOf<ToolExecution>()
+
+        repeat(maxIterations) {
+            val request = ChatRequest(
+                model = model,
+                temperature = 0.2,
+                tool_choice = if (toolSchemas.isEmpty()) null else "auto",
+                tools = toolSchemas.takeIf { it.isNotEmpty() },
+                messages = workingMessages
+            )
+
+            val response = execute(apiKey, request)
+            val message = response.choices.firstOrNull()?.message
+                ?: return ChatResult("(пусто)", workingMessages, appended, toolLog, false)
+
+            if (!message.content.isNullOrBlank()) {
+                val assistantMsg = Msg(role = message.role, content = message.content)
+                workingMessages.add(assistantMsg)
+                appended.add(assistantMsg)
+            }
+
+            val toolCalls = message.tool_calls.orEmpty()
+            if (toolCalls.isEmpty()) {
+                val reply = appended.lastOrNull { it.role == "assistant" }?.content ?: "(пусто)"
+                return ChatResult(reply, workingMessages, appended, toolLog, true)
+            }
+
+            for (call in toolCalls) {
+                val args = call.function.arguments ?: "{}"
+                val toolResult = onToolCall(call.function.name, args)
+                val toolMsg = Msg(role = "tool", content = toolResult.resultJson, name = call.function.name)
+                workingMessages.add(toolMsg)
+                appended.add(toolMsg)
+                toolLog.add(ToolExecution(call.function.name, args, toolResult))
+            }
+        }
+
+        val reply = appended.lastOrNull { it.role == "assistant" }?.content ?: "(пусто)"
+        return ChatResult(reply, workingMessages, appended, toolLog, false)
     }
 
     fun lastWasUncertain(text: String): Boolean {
@@ -105,6 +123,19 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
     data class Msg(val role: String, val content: String, val name: String? = null)
 
     @JsonClass(generateAdapter = true)
+    data class ToolDef(
+        val type: String = "function",
+        val function: FunctionDef
+    )
+
+    @JsonClass(generateAdapter = true)
+    data class FunctionDef(
+        val name: String,
+        val description: String,
+        @Json(name = "parameters") val jsonSchema: Map<String, Any>,
+    )
+
+    @JsonClass(generateAdapter = true)
     data class ChatRequest(
         val model: String,
         val messages: List<Msg>,
@@ -118,16 +149,22 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
     @JsonClass(generateAdapter = true) data class ChoiceMsg(
         val role: String,
         val content: String?,
-        val tool_calls: List<ToolCall>?
+        val tool_calls: List<ToolCall>?,
     )
+
     @JsonClass(generateAdapter = true) data class ToolCall(
         val id: String,
         val type: String,
-        val function: ToolFunction
+        val function: ToolFunction,
     )
+
     @JsonClass(generateAdapter = true) data class ToolFunction(
         val name: String,
-        val arguments: String?
+        val arguments: String?,
     )
-}
 
+    companion object {
+        fun newConversation(systemPrompt: String): MutableList<Msg> =
+            mutableListOf(Msg(role = "system", content = systemPrompt))
+    }
+}
