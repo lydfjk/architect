@@ -44,7 +44,7 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
 
         // Первый запрос
         val settings = ArchitectSettingsService.get(ctx)
-        val model = settings.state.model.ifBlank { "deepseek-chat-v3.2" }
+        val model = settings.state().model.ifBlank { "deepseek-chat-v3.2" }
 
         val req1 = ChatRequest(
             model = model,
@@ -130,3 +130,4 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
         val arguments: String?
     )
 }
+
