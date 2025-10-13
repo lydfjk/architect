@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.messages.MessagesService
 
 class RunPlaybookAction : AnAction(
     "Run Playbook…",
@@ -27,13 +28,14 @@ class RunPlaybookAction : AnAction(
         val titles = items.map { it.title }.toTypedArray()
 
         // ВАЖНО: используем перегрузку showChooseDialog с project и icon
-        val idx: Int = Messages.showChooseDialog(
-            /* project      = */ project,
-            /* message      = */ "Выберите плейбук для запуска",
-            /* title        = */ "Architect — Playbooks",
-            /* icon         = */ Messages.getQuestionIcon(), // у этой перегрузки icon обязателен
-            /* values       = */ titles,
-            /* initialValue = */ titles.first()
+        val idx: Int = MessagesService.getInstance().showChooseDialog(
+            /* project        = */ project,
+            /* parentComponent = */ null,
+            /* message        = */ "Выберите плейбук для запуска",
+            /* title          = */ "Architect — Playbooks",
+            /* values         = */ titles,
+            /* initialValue   = */ titles.first(),
+            /* icon           = */ Messages.getQuestionIcon()
         )
 
         if (idx < 0) return // пользователь нажал Cancel
@@ -61,3 +63,4 @@ class RunPlaybookAction : AnAction(
         )
     }
 }
+
