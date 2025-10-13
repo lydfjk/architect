@@ -17,9 +17,9 @@ class ArchitectSettingsService : PersistentStateComponent<ArchitectSettingsServi
     private var myState = State()
 
     val state: State
-        get() = myState
+    fun state(): State = myState
 
-    override fun getState() = myState
+    override fun getState(): State = myState
     override fun loadState(state: State) { myState = state }
     companion object {
         fun get(project: Project) = project.service<ArchitectSettingsService>()
@@ -64,4 +64,5 @@ class ArchitectConfigurable(private val project: Project) : Configurable {
         apiField.text = ""
     }
 }
+
 
