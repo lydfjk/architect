@@ -2,6 +2,8 @@ package ai.architect.agents
 
 import ai.architect.core.DeepSeekClient
 import ai.architect.core.ToolRegistry
+import ai.architect.core.toJsonString
+import ai.architect.tools.toToolCallResult
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
@@ -36,17 +38,52 @@ class BackgroundAgentService(private val project: Project) : Disposable {
                 while (true) {
                     val t = withContext(Dispatchers.IO) { queue.take() }
                     runCatching {
-                        client.chat(
-                            userText = "Выполни задачу: ${t.instruction}",
-                            toolSchemas = tools.schemas(),
-                            systemPreamble = """
-                                Ты фоновой агент. 
-                                Делаешь большие изменения через git_branch(worktree=true) + git_commit. 
-                                Если не уверен — сначала ищешь в интернете по официальным мануалам и Stack Overflow, 
-                                затем применяешь исправления. 
-                                В конце — краткий отчёт.
-                            """.trimIndent()
-                        ) { name, args -> tools.call(name, args).json }
+                        val basePrompt = """
+                            Ты фоновой агент.
+                            Делаешь большие изменения через git_branch(worktree=true) + git_commit.
+                            Если не уверен — сначала ищешь в интернете по официальным мануалам и Stack Overflow,
+                            затем применяешь исправления.
+                            В конце — краткий отчёт.
+                        """.trimIndent()
+
+                        var convo = DeepSeekClient.newConversation(basePrompt)
+                        convo.add(DeepSeekClient.Msg(role = "user", content = "Выполни задачу: ${t.instruction}"))
+
+                        val toolSchemas = tools.schemas()
+
+                        var result = client.chat(
+                            conversation = convo,
+                            toolSchemas = toolSchemas,
+                            onToolCall = { name, args -> tools.call(name, args).toToolCallResult() }
+                        )
+
+                        convo = result.conversation.toMutableList()
+
+                        if (client.lastWasUncertain(result.reply)) {
+                            val query = t.instruction
+                            val search = tools.call(
+                                "web_search",
+                                """{"query":${query.toJsonString()},"top_k":5}"""
+                            )
+                            convo.add(
+                                DeepSeekClient.Msg(
+                                    role = "assistant",
+                                    content = "Автопоиск подтверждает: ${search.humanReadable}".trim()
+                                )
+                            )
+                            convo.add(
+                                DeepSeekClient.Msg(
+                                    role = "user",
+                                    content = "С опорой на источники выше заверши задачу и перечисли ссылки."
+                                )
+                            )
+
+                            result = client.chat(
+                                conversation = convo,
+                                toolSchemas = toolSchemas,
+                                onToolCall = { name, args -> tools.call(name, args).toToolCallResult() }
+                            )
+                        }
                     }.onFailure {
                         // TODO: сюда можно добавить лог/уведомление об ошибке
                     }
