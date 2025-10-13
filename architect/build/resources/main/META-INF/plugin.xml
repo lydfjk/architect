@@ -1,0 +1,30 @@
+<idea-plugin>
+  <id>ai.architect</id>
+  <name>Architect</name>
+  <vendor email="you@example.com">You</vendor>
+  <version>0.1.0</version>
+  <idea-version since-build="252.26830" />
+  <!-- соответствует 2025.1+ -->
+  <description>Architect — ИИ-помощник для Android Studio/IntelliJ с DeepSeek API,
+        плейбуками (XML→Compose, Wear Tiles, KMP), фоновыми агентами и MCP-мостом.</description>
+  <depends>com.intellij.modules.platform</depends>
+  <depends optional="true">com.intellij.java</depends>
+  <actions>
+    <!-- Кнопка аудита безопасности -->
+    <action id="ai.architect.security.QuickMobileAuditAction" class="ai.architect.security.QuickMobileAuditAction" text="Quick Mobile Audit" description="Сканирование Android-проекта на типовые риски безопасности">
+      <add-to-group group-id="ToolsMenu" anchor="last" />
+    </action>
+    <!-- Кнопка запуска фонового агента -->
+    <action id="ai.architect.agents.BackgroundAgentSubmitAction" class="ai.architect.agents.BackgroundAgentSubmitAction" text="Run Background Agent…" description="Отправить задачу фоновому агенту">
+      <add-to-group group-id="ToolsMenu" anchor="last" />
+    </action>
+    <action id="ai.architect.playbooks.RunPlaybookAction" class="ai.architect.playbooks.RunPlaybookAction" text="Run Playbook…" description="Запустить один из плейбуков (XML→Compose, Wear Tiles, KMP)">
+      <add-to-group group-id="ToolsMenu" anchor="last" />
+    </action>
+  </actions>
+  <!-- Tool Window -->
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="Architect" factoryClass="ai.architect.ui.ArchitectToolWindowFactory" anchor="right" icon="/META-INF/pluginIcon.svg" canCloseContents="false" />
+    <projectConfigurable instance="ai.architect.settings.ArchitectConfigurable" />
+  </extensions>
+</idea-plugin>
