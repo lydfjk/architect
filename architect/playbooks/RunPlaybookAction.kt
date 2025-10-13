@@ -28,14 +28,16 @@ class RunPlaybookAction : AnAction(
         val titles = items.map { it.title }.toTypedArray()
 
         // ВАЖНО: используем перегрузку showChooseDialog с project и icon
-        val idx: Int = MessagesService.getInstance().showChooseDialog(
-            /* project        = */ project,
-            /* parentComponent = */ null,
-            /* message        = */ "Выберите плейбук для запуска",
-            /* title          = */ "Architect — Playbooks",
-            /* values         = */ titles,
-            /* initialValue   = */ titles.first(),
-            /* icon           = */ Messages.getQuestionIcon()
+        val titles = items.map { it.title }.toTypedArray()
+
+        @Suppress("DEPRECATION")
+        val idx: Int = Messages.showChooseDialog(
+            /* project      = */ project,
+            /* message      = */ "Выберите плейбук для запуска",
+            /* title        = */ "Architect — Playbooks",
+            /* icon         = */ Messages.getQuestionIcon(),
+            /* values       = */ titles,
+            /* initialValue = */ titles.first()
         )
 
         if (idx < 0) return // пользователь нажал Cancel
@@ -63,4 +65,5 @@ class RunPlaybookAction : AnAction(
         )
     }
 }
+
 
