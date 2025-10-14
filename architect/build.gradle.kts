@@ -22,6 +22,9 @@ dependencies {
     implementation("com.squareup.moshi:moshi:1.15.1")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jsoup:jsoup:1.20.1")            // HTML → текст, извлечение тайтлов и основного контента
+    implementation("io.github.java-diff-utils:java-diff-utils:4.16") // если решишь делать «ручное» применение патчей
+
 
     // (Опционально) MCP клиент — подключайте позже, когда дойдём до MCP:
     // implementation("io.modelcontextprotocol:kotlin-sdk-client:<latest>")
