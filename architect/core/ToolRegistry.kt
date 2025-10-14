@@ -22,6 +22,7 @@ class ToolRegistry(private val project: com.intellij.openapi.project.Project) {
         "apply_patch"    to ApplyPatchTool(project),
         "find_replace"   to FindReplaceTool(project),
         "run_tests"      to RunTestsTool(project),
+        "create_pr"     to CreatePrTool(project)
 // при неуверенности — обязательный
     )
 
@@ -39,5 +40,6 @@ interface ArchitectTool {
     fun schema(): DeepSeekClient.ToolDef
     fun invoke(jsonArgs: String): ToolResponse
 }
+
 
 
