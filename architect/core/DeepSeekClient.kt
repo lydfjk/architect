@@ -10,120 +10,38 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.Duration
+import com.intellij.openapi.project.Project
 
-class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
+class DeepSeekClient(private val project: Project) {
 
-    data class ToolCallResult(val resultJson: String, val humanReadable: String)
-
-    data class ToolExecution(
-        val name: String,
-        val arguments: String,
-        val result: ToolCallResult
-    )
-
-    data class ChatResult(
-        val reply: String,
-        val conversation: List<Msg>,
-        val appendedMessages: List<Msg>,
-        val toolExecutions: List<ToolExecution>,
-        val isFinal: Boolean
-    )
-
-    private val http = OkHttpClient.Builder()
-        .callTimeout(Duration.ofSeconds(90))
-        .build()
-
-    private val moshi = Moshi.Builder().build()
-    private val json = "application/json; charset=utf-8".toMediaType()
-
-    fun chat(
-        conversation: List<Msg>,
-        toolSchemas: List<ToolDef>,
-        onToolCall: (name: String, jsonArgs: String) -> ToolCallResult,
-        maxIterations: Int = 6
-    ): ChatResult {
-        val apiKey = SecretStore(ctx).loadApiKey()
-        require(!apiKey.isNullOrBlank()) { "DeepSeek API Key не настроен (Settings → Architect)" }
-
-        val settings = ArchitectSettingsService.get(ctx)
-        val model = settings.state().model.ifBlank { "deepseek-chat-v3.2" }
-
-        require(conversation.firstOrNull()?.role == "system") {
-            "История диалога должна начинаться с системного промпта"
-        }
-
-        val workingMessages = conversation.toMutableList()
-        val appended = mutableListOf<Msg>()
-        val toolLog = mutableListOf<ToolExecution>()
-
-        repeat(maxIterations) {
-        val request = ChatRequest(
-        model = model,
-        temperature = 0.2,
-        tool_choice = if (toolSchemas.isEmpty()) null else "auto",
-        tools = toolSchemas.takeIf { it.isNotEmpty() },
-        messages = workingMessages,
-        max_tokens = 2048
-            // response_format = mapOf("type" to "json_object") // включай при надобности
-        )
-
-
-            val response = execute(apiKey, request)
-            val message = response.choices.firstOrNull()?.message
-                ?: return ChatResult("(пусто)", workingMessages, appended, toolLog, false)
-
-            if (!message.content.isNullOrBlank()) {
-                val assistantMsg = Msg(role = message.role, content = message.content)
-                workingMessages.add(assistantMsg)
-                appended.add(assistantMsg)
-            }
-
-            val toolCalls = message.tool_calls.orEmpty()
-            if (toolCalls.isEmpty()) {
-                val reply = appended.lastOrNull { it.role == "assistant" }?.content ?: "(пусто)"
-                return ChatResult(reply, workingMessages, appended, toolLog, true)
-            }
-
-            for (call in toolCalls) {
-                val args = call.function.arguments ?: "{}"
-                val toolResult = onToolCall(call.function.name, args)
-                val toolMsg = Msg(role = "tool", content = toolResult.resultJson, name = call.function.name)
-                workingMessages.add(toolMsg)
-                appended.add(toolMsg)
-                toolLog.add(ToolExecution(call.function.name, args, toolResult))
-            }
-        }
-
-        val reply = appended.lastOrNull { it.role == "assistant" }?.content ?: "(пусто)"
-        return ChatResult(reply, workingMessages, appended, toolLog, false)
-    }
-
-    fun lastWasUncertain(text: String): Boolean {
-        val hints = listOf(
-            "не уверен", "недостаточно данных", "не могу найти",
-            "я не знаю", "ошибка", "unknown", "not sure"
-        )
-        return hints.any { text.contains(it, ignoreCase = true) }
-    }
-
-    private fun execute(apiKey: String, payload: ChatRequest): ChatResponse {
-        val body = moshi.adapter(ChatRequest::class.java).toJson(payload).toRequestBody(json)
-        val req = Request.Builder()
-            .url("https://api.deepseek.com/v1/chat/completions")
-            .addHeader("Authorization", "Bearer $apiKey")
-            .post(body)
-            .build()
-        http.newCall(req).execute().use { resp ->
-            val str = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) error("DeepSeek HTTP ${resp.code}: $str")
-            return moshi.adapter(ChatResponse::class.java).fromJson(str)
-                ?: error("Неизвестный ответ DeepSeek")
-        }
-    }
-
-    // --- DTO (OpenAI-совместимые) ---
     @JsonClass(generateAdapter = true)
-    data class Msg(val role: String, val content: String, val name: String? = null)
+    data class Msg(
+        val role: String,
+        val content: String? = null,
+        @Json(name = "tool_calls") val toolCalls: List<ToolCall>? = null,
+        @Json(name = "tool_call_id") val toolCallId: String? = null,
+        val name: String? = null
+    )
+
+    @JsonClass(generateAdapter = true)
+    data class ToolCall(
+        val id: String? = null,
+        val type: String = "function",
+        val function: ToolFunction
+    )
+
+    @JsonClass(generateAdapter = true)
+    data class ToolFunction(
+        val name: String,
+        val arguments: String?
+    )
+
+    @JsonClass(generateAdapter = true)
+    data class FunctionDef(
+        val name: String,
+        val description: String,
+        val parameters: Map<String, Any?>
+    )
 
     @JsonClass(generateAdapter = true)
     data class ToolDef(
@@ -132,49 +50,87 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
     )
 
     @JsonClass(generateAdapter = true)
-    data class FunctionDef(
-        val name: String,
-        val description: String,
-        @Json(name = "parameters") val jsonSchema: Map<String, Any>,
-    )
-
-    @JsonClass(generateAdapter = true)
     data class ChatRequest(
         val model: String,
         val messages: List<Msg>,
         val temperature: Double? = 0.2,
-        val top_p: Double? = null,
-        val max_tokens: Int? = null,
-        val frequency_penalty: Double? = null,
-        val presence_penalty: Double? = null,
-        val tool_choice: String? = null,          // "auto"
         val tools: List<ToolDef>? = null,
-        val response_format: Map<String, String>? = null // e.g., mapOf("type" to "json_object")
+        @Json(name = "tool_choice") val toolChoice: String? = "auto",
+        @Json(name = "response_format") val responseFormat: Map<String, String>? = null,
+        @Json(name = "max_tokens") val maxTokens: Int? = null,
+        val stream: Boolean? = false
     )
 
-    @JsonClass(generateAdapter = true) data class ChatResponse(val choices: List<Choice>)
-    @JsonClass(generateAdapter = true) data class Choice(val message: ChoiceMsg)
-    @JsonClass(generateAdapter = true) data class ChoiceMsg(
+    @JsonClass(generateAdapter = true)
+    data class ChoiceMessage(
         val role: String,
         val content: String?,
-        val tool_calls: List<ToolCall>?,
+        @Json(name = "tool_calls") val toolCalls: List<ToolCall>?
     )
 
-    @JsonClass(generateAdapter = true) data class ToolCall(
+    @JsonClass(generateAdapter = true)
+    data class Choice(
+        val index: Int,
+        val message: ChoiceMessage
+    )
+
+    @JsonClass(generateAdapter = true)
+    data class ChatResponse(
         val id: String,
-        val type: String,
-        val function: ToolFunction,
+        val choices: List<Choice>
     )
 
-    @JsonClass(generateAdapter = true) data class ToolFunction(
-        val name: String,
-        val arguments: String?,
+    data class ChatResult(
+        val content: String?,
+        val toolCalls: List<ToolCall>
     )
+
+    private val moshi = Moshi.Builder().build()
+    private val client = OkHttpClient.Builder()
+        .callTimeout(Duration.ofSeconds(60))
+        .build()
+
+    fun chat(messages: List<Msg>, tools: List<ToolDef>? = null): ChatResult {
+        val svc = ArchitectSettingsService.get(project).state
+        val apiKey = SecretStore(project).loadApiKey()
+            ?: error("DeepSeek API key is not set (Settings → Tools → Architect).")
+        val req = ChatRequest(
+            model = svc.model,
+            messages = messages,
+            tools = tools,
+            toolChoice = "auto",
+            temperature = 0.2,
+            // JSON‑режим включайте по месту: responseFormat = mapOf("type" to "json_object")
+        )
+        val adapter = moshi.adapter(ChatRequest::class.java)
+        val json = adapter.toJson(req)
+
+        val url = svc.apiBase.trimEnd('/') + "/chat/completions"
+        val httpReq = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .post(json.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        client.newCall(httpReq).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
+                throw IllegalStateException("DeepSeek API error: HTTP ${resp.code}\n$body")
+            }
+            val parsed = moshi.adapter(ChatResponse::class.java).fromJson(body)
+                ?: error("Empty DeepSeek response")
+
+            val msg = parsed.choices.firstOrNull()?.message
+            return ChatResult(
+                content = msg?.content,
+                toolCalls = msg?.toolCalls ?: emptyList()
+            )
+        }
+    }
 
     companion object {
         fun newConversation(systemPrompt: String): MutableList<Msg> =
             mutableListOf(Msg(role = "system", content = systemPrompt))
     }
 }
-
-
