@@ -68,6 +68,15 @@ class ArchitectChatController(
                     appendAssistantMessages(followUp)
                     lastReply = followUp.appendedMessages.lastOrNull { it.role == "assistant" }?.content.orEmpty()
                 }
+                // После вывода assistant-ответа — запустить пост-обработку по режиму
+                try {
+                val orchestrator = ai.architect.modes.AgentOrchestrator(project, tools, client)
+                    orchestrator.postProcessAssistantReply(lastReply)
+                } catch (t: Throwable) {
+                    // тихо логируем, чтобы не падать UI
+                    println("[Architect][AgentOrchestrator] " + t.message)
+                }
+
             } catch (t: Throwable) {
                 onAppend("Ошибка: ${t.message}")
             } finally {
@@ -100,4 +109,5 @@ class ArchitectChatController(
             .forEach { onAppend("Архитектор: ${it.content}") }
     }
 }
+
 
