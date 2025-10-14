@@ -6,19 +6,24 @@ import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.project.Project
 
 class SecretStore(private val project: Project) {
-    private fun attrs(): CredentialAttributes {
-        val service = "Architect/${project.name.ifBlank { "Project" }}/DEEPSEEK_API_KEY"
-        return CredentialAttributes(service)
-    }
+    private fun attr(name: String): CredentialAttributes =
+        CredentialAttributes("Architect/${project.name.ifBlank { "Project" }}/$name")
+
+    // DeepSeek
     fun saveApiKey(key: String?) {
         val credentials = if (key.isNullOrBlank()) null else Credentials("api", key)
-        PasswordSafe.instance.set(attrs(), credentials)
+        PasswordSafe.instance.set(attr("DEEPSEEK_API_KEY"), credentials)
     }
+    fun loadApiKey(): String? =
+        PasswordSafe.instance.get(attr("DEEPSEEK_API_KEY"))?.getPasswordAsString()
+            ?: System.getenv("DEEPSEEK_API_KEY")
 
-    fun loadApiKey(): String? {
-        // приоритет: PasswordSafe → env var
-        val fromSafe = PasswordSafe.instance.get(attrs())?.getPasswordAsString()
-        return fromSafe ?: System.getenv("DEEPSEEK_API_KEY")
+    // GitHub
+    fun saveGithubToken(token: String?) {
+        val credentials = if (token.isNullOrBlank()) null else Credentials("api", token)
+        PasswordSafe.instance.set(attr("GITHUB_TOKEN"), credentials)
     }
+    fun loadGithubToken(): String? =
+        PasswordSafe.instance.get(attr("GITHUB_TOKEN"))?.getPasswordAsString()
+            ?: System.getenv("GITHUB_TOKEN")
 }
-
