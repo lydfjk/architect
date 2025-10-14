@@ -43,30 +43,30 @@ class ArchitectChatController(
                 appendAssistantMessages(first)
 
                 var lastReply = first.appendedMessages.lastOrNull { it.role == "assistant" }?.content.orEmpty()
+// Если всё ещё не уверены — расширяем поиск за пределы SO:
                 if (client.lastWasUncertain(lastReply)) {
                     val query = conversation.lastOrNull { it.role == "user" }?.content ?: text
-                    val auto = tools.call("web_search", """{"query":${query.toJsonString()},"top_k":5}""")
-                    onAppend("🔎 Автопоиск: ${auto.humanReadable}")
+                    val ddg = tools.call("web_search_ddg", """{"query":${query.toJsonString()},"top_k":5}""")
+                    onAppend("🔎 Интернет‑поиск: ${ddg.humanReadable}")
 
-                    conversation.add(
-                        DeepSeekClient.Msg(
+                    // забираем 1–2 топовых страницы и подмешиваем выдержки
+                    val lines = ddg.humanReadable.lines().filter { it.startsWith("http") }
+                    val top = lines.take(2)
+                    for (u in top) {
+                        val fetched = tools.call("web_fetch", """{"url":${u.toJsonString()},"max_chars":50000}""")
+                        onAppend("🌐 ${fetched.humanReadable}")
+                        conversation.add(DeepSeekClient.Msg(
                             role = "assistant",
-                            content = "Результаты веб-поиска по запросу \"$query\":\n${auto.humanReadable}".trim()
-                        )
-                    )
-                    conversation.add(
-                        DeepSeekClient.Msg(
-                            role = "user",
-                            content = "С учётом найденных источников заверши решение и перечисли ссылки."
-                        )
-                    )
-
+                            content = "Источник: $u\n${fetched.humanReadable}"
+                        ))
+                    }
+                    conversation.add(DeepSeekClient.Msg(
+                        role = "user",
+                        content = "С учётом извлечённых источников заверши решение: дай финальные шаги и ссылки."
+                    ))
                     val followUp = runChatTurn()
                     appendAssistantMessages(followUp)
                     lastReply = followUp.appendedMessages.lastOrNull { it.role == "assistant" }?.content.orEmpty()
-                    if (client.lastWasUncertain(lastReply)) {
-                        onAppend("⚠️ Модель по-прежнему не уверена. Попробуйте уточнить запрос.")
-                    }
                 }
             } catch (t: Throwable) {
                 onAppend("Ошибка: ${t.message}")
@@ -100,3 +100,4 @@ class ArchitectChatController(
             .forEach { onAppend("Архитектор: ${it.content}") }
     }
 }
+
