@@ -57,13 +57,16 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
         val toolLog = mutableListOf<ToolExecution>()
 
         repeat(maxIterations) {
-            val request = ChatRequest(
-                model = model,
-                temperature = 0.2,
-                tool_choice = if (toolSchemas.isEmpty()) null else "auto",
-                tools = toolSchemas.takeIf { it.isNotEmpty() },
-                messages = workingMessages
-            )
+        val request = ChatRequest(
+        model = model,
+        temperature = 0.2,
+        tool_choice = if (toolSchemas.isEmpty()) null else "auto",
+        tools = toolSchemas.takeIf { it.isNotEmpty() },
+        messages = workingMessages,
+        max_tokens = 2048
+            // response_format = mapOf("type" to "json_object") // включай при надобности
+        )
+
 
             val response = execute(apiKey, request)
             val message = response.choices.firstOrNull()?.message
@@ -173,4 +176,5 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
             mutableListOf(Msg(role = "system", content = systemPrompt))
     }
 }
+
 
