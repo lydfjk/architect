@@ -139,9 +139,14 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
     data class ChatRequest(
         val model: String,
         val messages: List<Msg>,
-        val temperature: Double = 0.2,
+        val temperature: Double? = 0.2,
+        val top_p: Double? = null,
+        val max_tokens: Int? = null,
+        val frequency_penalty: Double? = null,
+        val presence_penalty: Double? = null,
+        val tool_choice: String? = null,          // "auto"
         val tools: List<ToolDef>? = null,
-        val tool_choice: String? = null,
+        val response_format: Map<String, String>? = null // e.g., mapOf("type" to "json_object")
     )
 
     @JsonClass(generateAdapter = true) data class ChatResponse(val choices: List<Choice>)
@@ -168,3 +173,4 @@ class DeepSeekClient(private val ctx: com.intellij.openapi.project.Project) {
             mutableListOf(Msg(role = "system", content = systemPrompt))
     }
 }
+
