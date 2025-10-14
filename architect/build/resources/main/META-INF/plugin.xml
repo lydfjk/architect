@@ -9,6 +9,13 @@
         плейбуками (XML→Compose, Wear Tiles, KMP), фоновыми агентами и MCP-мостом.</description>
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true">com.intellij.java</depends>
+
+  <action id="ai.architect.AgentModeToggle"
+        class="ai.architect.modes.AgentModeToggleAction"
+        text="Architect: Toggle Agent Mode"
+        description="Переключить режим агента (Chat/Apply/Run/Auto)">
+  <add-to-group group-id="ToolsMenu" anchor="last"/>
+  </action>
   <actions>
     <!-- Кнопка аудита безопасности -->
     <action id="ai.architect.security.QuickMobileAuditAction" class="ai.architect.security.QuickMobileAuditAction" text="Quick Mobile Audit" description="Сканирование Android-проекта на типовые риски безопасности">
@@ -28,3 +35,4 @@
     <projectConfigurable instance="ai.architect.settings.ArchitectConfigurable" />
   </extensions>
 </idea-plugin>
+
