@@ -14,7 +14,15 @@ class ToolRegistry(private val project: com.intellij.openapi.project.Project) {
         "git_commit" to GitCommitTool(project),
         "update_manifest" to UpdateManifestTool(project),
         "generate_icons" to GenerateIconsTool(project),
-        "web_search" to WebSearchTool(project), // при неуверенности — обязательный
+        "web_search" to WebSearchTool(project),
+        "web_search_ddg" to WebSearchDdGTool(project),
+        "web_fetch"      to WebFetchTool(project),
+        "verify_links"   to VerifyLinksTool(project),
+        "github_search"  to GitHubSearchTool(project),
+        "apply_patch"    to ApplyPatchTool(project),
+        "find_replace"   to FindReplaceTool(project),
+        "run_tests"      to RunTestsTool(project),
+// при неуверенности — обязательный
     )
 
     fun schemas(): List<DeepSeekClient.ToolDef> = tools.values.map { it.schema() }
@@ -31,4 +39,5 @@ interface ArchitectTool {
     fun schema(): DeepSeekClient.ToolDef
     fun invoke(jsonArgs: String): ToolResponse
 }
+
 
