@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.Duration
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 
 class DeepSeekClient(private val project: Project) {
 
@@ -91,7 +92,9 @@ class DeepSeekClient(private val project: Project) {
         val reply: String?
     )
 
-    private val moshi = Moshi.Builder().build()
+    private val moshi = Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
     private val client = OkHttpClient.Builder()
         .callTimeout(Duration.ofSeconds(120))
         .build()
@@ -211,3 +214,4 @@ class DeepSeekClient(private val project: Project) {
             mutableListOf(Msg(role = "system", content = systemPrompt))
     }
 }
+
