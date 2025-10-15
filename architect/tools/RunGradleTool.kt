@@ -5,7 +5,7 @@ import ai.architect.core.DeepSeekClient
 import com.intellij.openapi.project.Project
 import java.io.File
 
-class RunGradleTool(private val project: Project) : ArchitectTool, BaseCmdTool(project) {
+class RunGradleTool(project: Project) : ArchitectTool, BaseCmdTool(project) {
     override fun name() = "run_gradle"
     override fun description() = "Запускает gradle задачу (task)."
 
@@ -33,3 +33,4 @@ class RunGradleTool(private val project: Project) : ArchitectTool, BaseCmdTool(p
         return ToolResponse.ok("""{"ok":$ok,"exitCode":${out.exitCode}}""", log.take(10000))
     }
 }
+
