@@ -105,9 +105,10 @@ class ArchitectChatController(
 
     private fun appendAssistantMessages(result: DeepSeekClient.ChatResult) {
         result.appendedMessages
-            .filter { it.role == "assistant" && it.content.isNotBlank() }
-            .forEach { onAppend("Архитектор: ${it.content}") }
+            .filter { it.role == "assistant" && !it.content.isNullOrBlank() }
+            .forEach { onAppend("Архитектор: ${it.content.orEmpty()}") }
     }
 }
+
 
 
