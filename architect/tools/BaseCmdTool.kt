@@ -16,26 +16,6 @@ abstract class BaseCmdTool(protected val project: Project) {
     }
 }
 
-class RunGradleTool(project: Project) : ArchitectTool, BaseCmdTool(project) {
-    override fun name() = "run_gradle"
-    override fun description() = "Выполняет Gradle-задачу через ./gradlew."
-    override fun schema() = DeepSeekClient.ToolDef(function =
-        DeepSeekClient.FunctionDef(name(), description(), mapOf(
-            "type" to "object",
-            "properties" to mapOf("task" to mapOf("type" to "string")),
-            "required" to listOf("task")
-        ))
-    )
-    override fun invoke(jsonArgs: String): ToolResponse {
-        val task = "\"task\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(jsonArgs)?.groupValues?.get(1) ?: return ToolResponse.error("task?")
-        val root = File(project.basePath!!)
-        val gradlew = if (System.getProperty("os.name").lowercase().contains("win")) "gradlew.bat" else "gradlew"
-        val out = runCommand(listOf(File(root, gradlew).absolutePath, task), root)
-        val ok = out.exitCode == 0
-        return ToolResponse.ok("""{"ok":$ok,"exitCode":${out.exitCode}}""", out.stdout.ifBlank { out.stderr })
-    }
-}
-
 class RunCommandTool(project: Project) : ArchitectTool, BaseCmdTool(project) {
     override fun name() = "run_command"
     override fun description() = "Запускает консольную команду в корне проекта (белый список безопасных команд)."
@@ -103,4 +83,5 @@ class GitCommitTool(project: Project) : ArchitectTool, BaseCmdTool(project) {
         return ToolResponse.ok("""{"ok":true}""", (add.stdout + "\n" + commit.stdout).trim())
     }
 }
+
 
