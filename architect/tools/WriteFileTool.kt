@@ -2,7 +2,6 @@ package ai.architect.tools
 
 import ai.architect.core.ArchitectTool
 import ai.architect.core.DeepSeekClient
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -40,14 +39,13 @@ class WriteFileTool(private val project: Project) : ArchitectTool {
             return ToolResponse.error("Path escapes project root")
         }
 
-        val res = WriteCommandAction.runWriteCommandAction(project) {
+        WriteCommandAction.runWriteCommandAction(project) {
             target.parentFile.mkdirs()
             target.writeText(content)
-            LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)?.let { VfsUtil.markDirtyAndRefresh(true, false, false, it) }
+            LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)?.let {
+                VfsUtil.markDirtyAndRefresh(true, false, false, it)
+            }
         }
         return ToolResponse.ok("""{"ok":true,"path":${path.escapeJson()}}""", "Wrote $path")
     }
 }
-
-private fun String.escapeJson(): String = "\"" + this.replace("\\","\\\\").replace("\"","\\\"") + "\""
-private fun String.unescapeJson(): String = this.replace("\\\"","\"").replace("\\\\","\\")
