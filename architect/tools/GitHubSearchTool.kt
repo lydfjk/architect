@@ -17,9 +17,9 @@ class GitHubSearchTool(private val project: com.intellij.openapi.project.Project
         DeepSeekClient.FunctionDef(name(), description(), mapOf(
             "type" to "object",
             "properties" to mapOf(
-                "mode" to mapOf("type" to "string", "enum" to listOf("issues","code","repos"), "default" to "issues"),
+                "mode" to mapOf("type" to "string", "enum" to listOf("issues", "code", "repos"), "default" to "issues"),
                 "query" to mapOf("type" to "string"),
-                "per_page" to mapOf("type" to "integer","default" to 10)
+                "per_page" to mapOf("type" to "integer", "default" to 10)
             ),
             "required" to listOf("query")
         ))
@@ -27,10 +27,11 @@ class GitHubSearchTool(private val project: com.intellij.openapi.project.Project
 
     override fun invoke(jsonArgs: String): ToolResponse {
         val mode = "\"mode\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(jsonArgs)?.groupValues?.get(1) ?: "issues"
-        val q    = "\"query\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(jsonArgs)?.groupValues?.get(1) ?: return ToolResponse.error("query?")
-        val per  = "\"per_page\"\\s*:\\s*(\\d+)".toRegex().find(jsonArgs)?.groupValues?.get(1)?.toInt() ?: 10
+        val q = "\"query\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(jsonArgs)?.groupValues?.get(1)
+            ?: return ToolResponse.error("query?")
+        val per = "\"per_page\"\\s*:\\s*(\\d+)".toRegex().find(jsonArgs)?.groupValues?.get(1)?.toInt() ?: 10
 
-        val endpoint = when(mode) {
+        val endpoint = when (mode) {
             "code" -> "https://api.github.com/search/code"
             "repos" -> "https://api.github.com/search/repositories"
             else -> "https://api.github.com/search/issues"
@@ -52,6 +53,3 @@ class GitHubSearchTool(private val project: com.intellij.openapi.project.Project
         }
     }
 }
-
-private fun String.escapeJson(): String =
-    "\"" + this.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
