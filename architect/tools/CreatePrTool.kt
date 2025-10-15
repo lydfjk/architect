@@ -3,6 +3,7 @@ package ai.architect.tools
 import ai.architect.core.ArchitectTool
 import ai.architect.core.DeepSeekClient
 import ai.architect.settings.SecretStore
+import com.intellij.openapi.project.Project
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -29,7 +30,7 @@ import java.time.Duration
  * - use_cli_first: boolean (опц., сначала пробовать `gh pr create`)
  */
 class CreatePrTool(
-    private val project: com.intellij.openapi.project.Project
+                   project: Project
 ) : ArchitectTool, BaseCmdTool(project) {
 
     private val http = OkHttpClient.Builder()
@@ -94,7 +95,7 @@ class CreatePrTool(
         if (args.useCliFirst && hasGh()) {
             val cliRes = ghCreatePr(owner, repoName, head, base, args, root)
             if (cliRes != null) return cliRes
-        }
+        }}
 
         // Создаём PR через REST
         val createJson = buildString {
@@ -189,7 +190,7 @@ class CreatePrTool(
         return res.stdout.trim() == "0"
     }
 
-    private fun ghCreatePr(owner: String, repo: String, head: String, base: String, a: Args, cwd: File): ToolResponse? {
+    private fun ghCreatePr(owner: String, repo: String, head: String, base: String, a: Args.P, cwd: File): ToolResponse? {
         val flags = mutableListOf<String>()
         flags += listOf("gh","pr","create","-R","$owner/$repo","-H", head,"-B", base,"-t", a.title)
         if (!a.body.isNullOrBlank()) flags += listOf("-b", a.body!!)
@@ -275,6 +276,4 @@ class CreatePrTool(
 }
 
 // JSON-утилиты
-private fun String.escapeJson(): String =
-    "\"" + this.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 private fun escape(s: String) = s.replace("\"","\\\"")
