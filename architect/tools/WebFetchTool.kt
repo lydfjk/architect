@@ -48,7 +48,6 @@ class WebFetchTool(private val project: com.intellij.openapi.project.Project) : 
             if (isHtml) {
                 val doc = Jsoup.parse(body)
                 title = (doc.title() ?: "").trim()
-                // простая очистка; для продакшна можно прикрутить Readability/Boilerpipe
                 text = doc.select("article, main, body").text().take(max)
             } else {
                 title = url
@@ -61,11 +60,8 @@ class WebFetchTool(private val project: com.intellij.openapi.project.Project) : 
                 appendLine(text.take(2000))
                 if (text.length > 2000) appendLine("… (обрезано)")
             }
-            val json = """{"ok":true,"status":$code,"title":${title.escapeJson()},"url":${url.escapeJson()},"content":${text.escapeJson()}}"""
+            val json = """{"ok":true,"status":$code,"title":${title.escapeJson()},"url":${url.escapeJson()},"content":${text.escapeJson()}}""""
             return ToolResponse.ok(json, pretty)
         }
     }
 }
-
-private fun String.escapeJson(): String =
-    "\"" + this.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
