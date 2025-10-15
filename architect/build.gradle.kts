@@ -39,6 +39,24 @@ intellijPlatform {
 
 kotlin {
     jvmToolchain(17)
+    sourceSets {
+        val main by getting {
+            kotlin.setSrcDirs(
+                listOf(
+                    "agents",
+                    "core",
+                    "modes",
+                    "persona",
+                    "playbooks",
+                    "security",
+                    "settings",
+                    "tools",
+                    "ui"
+                )
+            )
+            resources.setSrcDirs(listOf("resources"))
+        }
+    }
 }
 
 java {
