@@ -15,7 +15,7 @@ class WebSearchDdGTool(private val project: Project) : ArchitectTool {
         .followRedirects(true)
         .build()
 
-    override fun name() = "web_search"
+    override fun name() = "web_search_ddg"
     override fun description() = "Ищет в интернете через DuckDuckGo (без API‑ключа). Аргументы: query (string), limit (int)."
 
     override fun schema() = DeepSeekClient.ToolDef(
@@ -55,7 +55,7 @@ class WebSearchDdGTool(private val project: Project) : ArchitectTool {
             val pretty = buildString {
                 appendLine("DuckDuckGo results for: $q")
                 items.forEachIndexed { i, (title, link) ->
-                    appendLine("${i+1}. $title")
+                    appendLine("${i + 1}. $title")
                     appendLine(link)
                     appendLine()
                 }
@@ -68,13 +68,9 @@ class WebSearchDdGTool(private val project: Project) : ArchitectTool {
     }
 
     private fun decodeDuckLink(href: String): String? {
-        // ссылки DDG вида https://duckduckgo.com/l/?uddg=...
         val idx = href.indexOf("uddg=")
         if (idx < 0) return if (href.startsWith("http")) href else null
         val enc = href.substring(idx + 5).split("&", limit = 2).first()
         return runCatching { URLDecoder.decode(enc, "UTF-8") }.getOrNull()
     }
 }
-
-private fun String.escapeJson(): String = "\"" + this.replace("\\","\\\\").replace("\"","\\\"") + "\""
-private fun String.unescapeJson(): String = this.replace("\\\"","\"").replace("\\\\","\\")
