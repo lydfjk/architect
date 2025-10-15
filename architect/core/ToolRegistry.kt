@@ -1,35 +1,58 @@
 package ai.architect.core
 
-import ai.architect.tools.*
+import ai.architect.tools.ApplyPatchTool
+import ai.architect.tools.CreatePrTool
+import ai.architect.tools.FindReplaceTool
+import ai.architect.tools.GenerateIconsTool
+import ai.architect.tools.GitBranchTool
+import ai.architect.tools.GitCommitTool
+import ai.architect.tools.GitHubSearchTool
+import ai.architect.tools.ListFilesTool
+import ai.architect.tools.ReadFileTool
+import ai.architect.tools.RunCommandTool
+import ai.architect.tools.RunGradleTool
+import ai.architect.tools.RunTestsTool
+import ai.architect.tools.ToolResponse
+import ai.architect.tools.UpdateManifestTool
+import ai.architect.tools.WebFetchTool
+import ai.architect.tools.WebSearchDdGTool
+import ai.architect.tools.WebSearchTool
+import ai.architect.tools.WriteFileTool
 import com.intellij.openapi.project.Project
 
 class ToolRegistry(private val project: Project) {
 
-    private val tools: Map<String, ArchitectTool> = mapOf(
-        // файловые операции
-        "read_file" to ReadFileTool(project),
-        "write_file" to WriteFileTool(project),
-        "list_files" to ListFilesTool(project),
+    private val tools: Map<String, ArchitectTool> = listOf(
+        ReadFileTool(project),
+        WriteFileTool(project),
+        ListFilesTool(project),
+        FindReplaceTool(project),
+        RunGradleTool(project),
+        RunCommandTool(project),
+        RunTestsTool(project),
+        GitBranchTool(project),
+        GitCommitTool(project),
+        ApplyPatchTool(project),
+        CreatePrTool(project),
+        UpdateManifestTool(project),
+        GenerateIconsTool(project),
+        GitHubSearchTool(project),
+        WebSearchTool(project),
+        WebSearchDdGTool(project),
+        WebFetchTool(project)
+    ).associateBy { it.name() }
 
-        // сборка/запуск
-        "run_gradle" to RunGradleTool(project),
-        "run_command" to RunCommandTool(project),
-        "run_tests" to RunTestsTool(project),
-
-        // git
-        "git_branch" to GitBranchTool(project),
-        "git_commit" to GitCommitTool(project),
-
-        // веб и поиск
-        "web_search" to WebSearchDdGTool(project),
-        "web_fetch" to WebFetchTool(project)
-    )
-
-    fun allToolDefs(): List<DeepSeekClient.ToolDef> =
+    fun schemas(): List<DeepSeekClient.ToolDef> =
         tools.values.map { it.schema() }
 
-    fun invoke(name: String, jsonArgs: String): ToolResponse =
-        tools[name]?.invoke(jsonArgs) ?: ToolResponse.error("Unknown tool: $name")
+    fun call(name: String, jsonArgs: String): ToolResponse {
+        val tool = tools[name] ?: return ToolResponse.error("Unknown tool: $name")
+        return runCatching { tool.invoke(jsonArgs) }
+            .onFailure { println("[Architect][ToolRegistry] $name failed: ${it.message}") }
+            .getOrElse { ToolResponse.error("Tool $name error: ${it.message ?: it::class.java.simpleName}") }
+    }
+
+    fun toolNames(): Set<String> = tools.keys
 }
 
 interface ArchitectTool {
@@ -38,4 +61,5 @@ interface ArchitectTool {
     fun schema(): DeepSeekClient.ToolDef
     fun invoke(jsonArgs: String): ToolResponse
 }
+
 
