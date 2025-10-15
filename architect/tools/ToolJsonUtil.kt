@@ -1,5 +1,23 @@
 package ai.architect.tools
 
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+
+internal val toolMoshi: Moshi by lazy {
+    Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
+}
+
+internal inline fun <reified T> parseToolArgs(json: String): Result<T> =
+    runCatching {
+        toolMoshi.adapter(T::class.java).fromJson(json)
+            ?: throw IllegalArgumentException("Arguments JSON is empty")
+    }
+
+internal fun Throwable.readableMessage(): String =
+    message?.takeIf { it.isNotBlank() } ?: this::class.java.simpleName
+
 internal fun String.escapeJson(): String = buildString {
     append('"')
     for (ch in this@escapeJson) {
