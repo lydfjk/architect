@@ -25,8 +25,6 @@ class RunPlaybookAction : AnAction(
             return
         }
 
-        val titles = items.map { it.title }.toTypedArray()
-
         // ВАЖНО: используем перегрузку showChooseDialog с project и icon
         val titles = items.map { it.title }.toTypedArray()
 
@@ -65,5 +63,6 @@ class RunPlaybookAction : AnAction(
         )
     }
 }
+
 
 
