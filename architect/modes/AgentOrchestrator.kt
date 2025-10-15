@@ -84,8 +84,24 @@ class AgentOrchestrator(
         notify(res.humanReadable)
     }
 
+    private fun generatePatchByModel(): String? {
+        val prompt = """
+            Ты — senior-инженер DeepSeek. Пользователь просит внести изменения, но в предыдущем ответе не было diff.
+            Сгенерируй минимальный unified diff (формат git diff --stat), который реализует запрос.
+            Если изменений несколько — объединяй их в один diff.
+            Если diff не нужен, верни пустую строку.
+        """.trimIndent()
+
+        val reply = client.chatOnce(
+            system = prompt,
+            user = "Сформируй unified diff в формате ```diff``` для текущего запроса."
+        )
+        return extractUnifiedDiff(reply)
+    }
+
     private fun notify(msg: String) {
         // минимальное уведомление — IDE уведомления у тебя уже есть (см. контроллер/UI)
         println("[Architect] $msg")
     }
 }
+
