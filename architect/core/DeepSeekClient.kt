@@ -2,6 +2,7 @@ package ai.architect.core
 
 import ai.architect.settings.ArchitectSettingsService
 import ai.architect.settings.SecretStore
+import com.intellij.openapi.project.Project
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
@@ -10,7 +11,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.Duration
-import com.intellij.openapi.project.Project
 
 class DeepSeekClient(private val project: Project) {
 
@@ -80,53 +80,130 @@ class DeepSeekClient(private val project: Project) {
         val choices: List<Choice>
     )
 
+    data class ToolCallResult(
+        val outputJson: String,
+        val humanReadable: String
+    )
+
     data class ChatResult(
-        val content: String?,
-        val toolCalls: List<ToolCall>
+        val conversation: List<Msg>,
+        val appendedMessages: List<Msg>,
+        val reply: String?
     )
 
     private val moshi = Moshi.Builder().build()
     private val client = OkHttpClient.Builder()
-        .callTimeout(Duration.ofSeconds(60))
+        .callTimeout(Duration.ofSeconds(120))
         .build()
 
-    fun chat(messages: List<Msg>, tools: List<ToolDef>? = null): ChatResult {
-        val svc = ArchitectSettingsService.get(project).state
+    fun chat(
+        conversation: List<Msg>,
+        toolSchemas: List<ToolDef>? = null,
+        onToolCall: ((String, String) -> ToolCallResult)? = null,
+        maxToolLoops: Int = 4
+    ): ChatResult {
+        val current = conversation.toMutableList()
+        val appended = mutableListOf<Msg>()
+        var loops = 0
+
+        while (true) {
+            val response = execute(current, toolSchemas)
+            val message = response.choices.firstOrNull()?.message
+                ?: return ChatResult(current, appended, appended.lastOrNull { it.role == "assistant" }?.content)
+
+            val assistantMsg = Msg(
+                role = message.role,
+                content = message.content,
+                toolCalls = message.toolCalls
+            )
+            current.add(assistantMsg)
+            appended += assistantMsg
+
+            val toolCalls = message.toolCalls.orEmpty()
+            if (toolCalls.isEmpty()) {
+                return ChatResult(current, appended, assistantMsg.content)
+            }
+            if (onToolCall == null) {
+                throw IllegalStateException("Model requested tool execution but handler is null")
+            }
+            loops += 1
+            if (loops > maxToolLoops) {
+                return ChatResult(current, appended, assistantMsg.content)
+            }
+
+            val toolMessages = toolCalls.map { call ->
+                val args = call.function.arguments ?: "{}"
+                val result = onToolCall.invoke(call.function.name, args)
+                Msg(
+                    role = "tool",
+                    content = result.outputJson,
+                    toolCallId = call.id,
+                    name = call.function.name
+                )
+            }
+            toolMessages.forEach { appended += it }
+            current.addAll(toolMessages)
+        }
+    }
+
+    private fun execute(messages: List<Msg>, tools: List<ToolDef>?): ChatResponse {
+        val settings = ArchitectSettingsService.get(project).state
         val apiKey = SecretStore(project).loadApiKey()
             ?: error("DeepSeek API key is not set (Settings → Tools → Architect).")
-        val req = ChatRequest(
-            model = svc.model,
-            messages = messages,
-            tools = tools,
-            toolChoice = "auto",
-            temperature = 0.2,
-            // JSON‑режим включайте по месту: responseFormat = mapOf("type" to "json_object")
-        )
-        val adapter = moshi.adapter(ChatRequest::class.java)
-        val json = adapter.toJson(req)
 
-        val url = svc.apiBase.trimEnd('/') + "/chat/completions"
-        val httpReq = Request.Builder()
+        val request = ChatRequest(
+            model = settings.model,
+            messages = messages,
+            tools = tools?.takeIf { it.isNotEmpty() },
+            toolChoice = if (!tools.isNullOrEmpty()) "auto" else null,
+            temperature = 0.2
+        )
+        val json = moshi.adapter(ChatRequest::class.java).toJson(request)
+
+        val url = settings.apiBase.trimEnd('/') + "/chat/completions"
+        val httpRequest = Request.Builder()
             .url(url)
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
             .post(json.toRequestBody("application/json".toMediaType()))
             .build()
 
-        client.newCall(httpReq).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) {
-                throw IllegalStateException("DeepSeek API error: HTTP ${resp.code}\n$body")
+        client.newCall(httpRequest).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IllegalStateException("DeepSeek API error: HTTP ${response.code}\n$body")
             }
-            val parsed = moshi.adapter(ChatResponse::class.java).fromJson(body)
+            return moshi.adapter(ChatResponse::class.java).fromJson(body)
                 ?: error("Empty DeepSeek response")
-
-            val msg = parsed.choices.firstOrNull()?.message
-            return ChatResult(
-                content = msg?.content,
-                toolCalls = msg?.toolCalls ?: emptyList()
-            )
         }
+    }
+
+    fun chatOnce(system: String, user: String): String {
+        val convo = newConversation(system)
+        convo.add(Msg(role = "user", content = user))
+        val result = chat(convo)
+        return result.reply.orEmpty()
+    }
+
+    fun lastWasUncertain(reply: String?): Boolean {
+        val text = reply?.lowercase()?.trim() ?: return true
+        if (text.isBlank()) return true
+        val patterns = listOf(
+            "не уверен",
+            "не могу",
+            "не удалось",
+            "не нашел",
+            "не нашёл",
+            "i'm not sure",
+            "i am not sure",
+            "not sure",
+            "don't know",
+            "do not know",
+            "unable to",
+            "cannot",
+            "can't help"
+        )
+        return patterns.any { it in text }
     }
 
     companion object {
