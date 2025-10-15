@@ -62,10 +62,3 @@ class FindReplaceTool(private val project: Project) : ArchitectTool {
     }
 }
 
-// Утилиты
-private fun String.matchesGlob(glob: String): Boolean {
-    val regex = glob.replace(".", "\\.").replace("**", ".+").replace("*", "[^/]*")
-    return Regex("^$regex$").matches(this)
-}
-private fun List<String>.toJsonArray(): String =
-    "[" + this.joinToString(",") { "\"" + it.replace("\\", "\\\\") + "\"" } + "]"
